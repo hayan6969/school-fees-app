@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Users,
   Receipt,
+  TrendingUp,
   Settings,
   GraduationCap,
   Menu,
@@ -18,6 +19,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/students", label: "Students", icon: Users },
   { href: "/fees", label: "Fee Challans", icon: Receipt },
+  { href: "/finance", label: "Finance", icon: TrendingUp },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

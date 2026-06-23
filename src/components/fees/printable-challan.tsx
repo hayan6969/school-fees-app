@@ -1,5 +1,7 @@
 "use client";
 
+import { Fragment, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import type { FeeChallan } from "@/lib/supabase/types";
 import { formatCurrency, getMonthName } from "@/lib/fee-utils";
 import { Separator } from "@/components/ui/separator";
@@ -10,6 +12,10 @@ interface PrintableChallanProps {
 }
 
 export function PrintableChallan({ challan, settings }: PrintableChallanProps) {
+  // Portal target only exists after mount (avoids SSR mismatch)
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const schoolName = settings.school_name ?? "School Name";
   const schoolAddress = settings.school_address ?? "";
   const schoolPhone = settings.school_phone ?? "";
@@ -129,38 +135,37 @@ export function PrintableChallan({ challan, settings }: PrintableChallanProps) {
         )}
       </div>
 
-      {/* Printable Area (A4) - hidden on screen, shown on print */}
-      <div className="print-only hidden print:block">
-        <style>{`
-          @media print {
-            body * { visibility: hidden !important; }
-            .print-only, .print-only * { visibility: visible !important; }
-            .print-only { position: fixed; top: 0; left: 0; width: 210mm; }
-          }
-        `}</style>
-
-        <div style={{ width: "210mm", padding: "10mm", fontFamily: "Arial, sans-serif", fontSize: "11pt" }}>
-          {/* Two copies on one page */}
-          {(["School Copy", "Student Copy"] as const).map((copyLabel, idx) => (
-            <div
-              key={copyLabel}
-              style={{
-                border: "1px solid #ccc",
-                padding: "8mm",
-                marginBottom: idx === 0 ? "5mm" : 0,
-                position: "relative",
-              }}
-            >
+      {/* Printable Area (A4) — portaled to <body> so it isn't hidden by the app shell on print */}
+      {mounted && createPortal(
+        <div className="print-root">
+        <div style={{ width: "100%", fontFamily: "Arial, sans-serif", fontSize: "11pt", boxSizing: "border-box", color: "#000", background: "#fff" }}>
+          {/* Two copies on one A4 — Office Copy (top) + Student Copy (bottom), cut along the dashed line */}
+          {(["Office Copy", "Student Copy"] as const).map((copyLabel, idx) => (
+            <Fragment key={copyLabel}>
+              {idx === 1 && (
+                <div style={{ textAlign: "center", fontSize: "7pt", color: "#999", borderTop: "1px dashed #aaa", margin: "4mm 0", paddingTop: "1mm", letterSpacing: "0.1em" }}>
+                  ✂ cut here
+                </div>
+              )}
+              <div
+                style={{
+                  border: "1px solid #ccc",
+                  padding: "5mm",
+                  position: "relative",
+                  breakInside: "avoid",
+                  pageBreakInside: "avoid",
+                }}
+              >
               {/* Copy label */}
               <div
                 style={{
                   position: "absolute",
                   top: "3mm",
-                  right: "5mm",
+                  right: "4mm",
                   fontSize: "8pt",
                   color: "#888",
                   border: "1px solid #ccc",
-                  padding: "1mm 3mm",
+                  padding: "0.5mm 2.5mm",
                   borderRadius: "2mm",
                 }}
               >
@@ -168,17 +173,17 @@ export function PrintableChallan({ challan, settings }: PrintableChallanProps) {
               </div>
 
               {/* School Header */}
-              <div style={{ textAlign: "center", borderBottom: "2px solid #000", paddingBottom: "4mm", marginBottom: "4mm" }}>
-                <h2 style={{ margin: 0, fontSize: "14pt", fontWeight: "bold" }}>{schoolName}</h2>
-                {schoolAddress && <p style={{ margin: "1mm 0 0", fontSize: "9pt", color: "#555" }}>{schoolAddress}</p>}
-                {schoolPhone && <p style={{ margin: "0.5mm 0 0", fontSize: "9pt", color: "#555" }}>Tel: {schoolPhone}</p>}
-                <p style={{ margin: "2mm 0 0", fontSize: "11pt", fontWeight: "bold" }}>
+              <div style={{ textAlign: "center", borderBottom: "2px solid #000", paddingBottom: "2mm", marginBottom: "3mm" }}>
+                <h2 style={{ margin: 0, fontSize: "13pt", fontWeight: "bold" }}>{schoolName}</h2>
+                {schoolAddress && <p style={{ margin: "0.5mm 0 0", fontSize: "8pt", color: "#555" }}>{schoolAddress}</p>}
+                {schoolPhone && <p style={{ margin: "0.5mm 0 0", fontSize: "8pt", color: "#555" }}>Tel: {schoolPhone}</p>}
+                <p style={{ margin: "1.5mm 0 0", fontSize: "10pt", fontWeight: "bold" }}>
                   FEE CHALLAN — {monthYear.toUpperCase()}
                 </p>
               </div>
 
               {/* Student Info Grid */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3mm", marginBottom: "4mm" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2mm 4mm", marginBottom: "3mm" }}>
                 <InfoCell label="Student Name" value={student?.full_name ?? ""} />
                 <InfoCell label="Registration No." value={student?.registration_number ?? ""} mono />
                 <InfoCell label="Class / Grade" value={student?.grade?.name ?? ""} />
@@ -199,26 +204,26 @@ export function PrintableChallan({ challan, settings }: PrintableChallanProps) {
               </div>
 
               {/* Fee Table */}
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "10pt" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "9.5pt" }}>
                 <thead>
                   <tr style={{ borderBottom: "1.5px solid #000" }}>
-                    <th style={{ textAlign: "left", padding: "1.5mm 2mm", fontWeight: "bold" }}>Description</th>
-                    <th style={{ textAlign: "right", padding: "1.5mm 2mm", fontWeight: "bold" }}>Amount (Rs)</th>
+                    <th style={{ textAlign: "left", padding: "1mm 2mm", fontWeight: "bold" }}>Description</th>
+                    <th style={{ textAlign: "right", padding: "1mm 2mm", fontWeight: "bold" }}>Amount (Rs)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {feeRows.map((row, i) => (
                     <tr key={row.label} style={{ borderBottom: "0.5px solid #e0e0e0", background: i % 2 === 0 ? "#fafafa" : "#fff" }}>
-                      <td style={{ padding: "1.5mm 2mm" }}>{row.label}</td>
-                      <td style={{ textAlign: "right", padding: "1.5mm 2mm" }}>
+                      <td style={{ padding: "1mm 2mm" }}>{row.label}</td>
+                      <td style={{ textAlign: "right", padding: "1mm 2mm" }}>
                         {row.amount.toLocaleString("en-PK")}
                       </td>
                     </tr>
                   ))}
                   {discount > 0 && (
                     <tr style={{ color: "#16a34a" }}>
-                      <td style={{ padding: "1.5mm 2mm" }}>{scholarshipLabel ?? "Discount"}</td>
-                      <td style={{ textAlign: "right", padding: "1.5mm 2mm" }}>
+                      <td style={{ padding: "1mm 2mm" }}>{scholarshipLabel ?? "Discount"}</td>
+                      <td style={{ textAlign: "right", padding: "1mm 2mm" }}>
                         - {discount.toLocaleString("en-PK")}
                       </td>
                     </tr>
@@ -226,8 +231,8 @@ export function PrintableChallan({ challan, settings }: PrintableChallanProps) {
                 </tbody>
                 <tfoot>
                   <tr style={{ borderTop: "2px solid #000", fontWeight: "bold" }}>
-                    <td style={{ padding: "2mm 2mm" }}>TOTAL</td>
-                    <td style={{ textAlign: "right", padding: "2mm 2mm", fontSize: "12pt" }}>
+                    <td style={{ padding: "1.5mm 2mm" }}>TOTAL</td>
+                    <td style={{ textAlign: "right", padding: "1.5mm 2mm", fontSize: "11pt" }}>
                       Rs {challan.total.toLocaleString("en-PK")}
                     </td>
                   </tr>
@@ -235,18 +240,18 @@ export function PrintableChallan({ challan, settings }: PrintableChallanProps) {
               </table>
 
               {/* Footer row */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "3mm", marginTop: "6mm", paddingTop: "3mm", borderTop: "0.5px solid #ccc" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "3mm", marginTop: "3mm", paddingTop: "2mm", borderTop: "0.5px solid #ccc" }}>
                 <div>
-                  <p style={{ fontSize: "8pt", color: "#888", margin: 0 }}>Cashier Signature</p>
-                  <div style={{ marginTop: "4mm", borderBottom: "1px solid #000", width: "100%" }} />
+                  <p style={{ fontSize: "7.5pt", color: "#888", margin: 0 }}>Cashier Signature</p>
+                  <div style={{ marginTop: "3mm", borderBottom: "1px solid #000", width: "100%" }} />
                 </div>
                 <div>
-                  <p style={{ fontSize: "8pt", color: "#888", margin: 0 }}>Date Paid</p>
-                  <div style={{ marginTop: "4mm", borderBottom: "1px solid #000", width: "100%" }} />
+                  <p style={{ fontSize: "7.5pt", color: "#888", margin: 0 }}>Date Paid</p>
+                  <div style={{ marginTop: "3mm", borderBottom: "1px solid #000", width: "100%" }} />
                 </div>
                 <div>
-                  <p style={{ fontSize: "8pt", color: "#888", margin: 0 }}>Stamp</p>
-                  <div style={{ marginTop: "4mm", height: "10mm", border: "1px dashed #ccc" }} />
+                  <p style={{ fontSize: "7.5pt", color: "#888", margin: 0 }}>Stamp</p>
+                  <div style={{ marginTop: "2mm", height: "7mm", border: "1px dashed #ccc" }} />
                 </div>
               </div>
 
@@ -254,11 +259,11 @@ export function PrintableChallan({ challan, settings }: PrintableChallanProps) {
                 <div
                   style={{
                     position: "absolute",
-                    top: "30%",
-                    left: "30%",
+                    top: "35%",
+                    left: "32%",
                     transform: "rotate(-20deg)",
                     opacity: 0.15,
-                    fontSize: "48pt",
+                    fontSize: "40pt",
                     fontWeight: "bold",
                     color: "#16a34a",
                     pointerEvents: "none",
@@ -268,10 +273,13 @@ export function PrintableChallan({ challan, settings }: PrintableChallanProps) {
                   PAID
                 </div>
               )}
-            </div>
+              </div>
+            </Fragment>
           ))}
         </div>
-      </div>
+        </div>,
+        document.body
+      )}
     </>
   );
 }

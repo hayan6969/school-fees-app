@@ -127,10 +127,17 @@
   }
 }
 
+/* Print root is portaled to <body>; hidden on screen, shown only when printing */
+@media screen {
+  .print-root {
+    display: none !important;
+  }
+}
+
 @media print {
   @page {
     size: A4 portrait;
-    margin: 0;
+    margin: 8mm;
   }
   .no-print {
     display: none !important;
@@ -138,15 +145,11 @@
   .print-break {
     page-break-after: always;
   }
-  /* Hide everything except printable challan */
-  body > * {
+  /* Hide the whole app shell, reveal only the portaled challan */
+  body > *:not(.print-root) {
     display: none !important;
   }
-  .print-only {
+  .print-root {
     display: block !important;
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 210mm !important;
   }
 }
