@@ -3,6 +3,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { Grade } from "@/lib/supabase/types";
+import { requireAdmin } from "@/lib/auth";
+import { logAction } from "@/app/actions/audit";
 
 export async function getGrades(): Promise<Grade[]> {
   const supabase = await createClient();
@@ -19,29 +21,35 @@ export async function createGrade(values: {
   monthly_fee: number;
   display_order: number;
 }) {
+  await requireAdmin();
   const supabase = await createClient();
   const { error } = await supabase.from("grades").insert(values as never);
   if (error) throw error;
   revalidatePath("/settings");
   revalidatePath("/students");
+  await logAction("Classes", "Added class", values.name);
 }
 
 export async function updateGrade(
   id: string,
   values: { name?: string; monthly_fee?: number; display_order?: number }
 ) {
+  await requireAdmin();
   const supabase = await createClient();
   const { error } = await supabase.from("grades").update(values as never).eq("id", id);
   if (error) throw error;
   revalidatePath("/settings");
   revalidatePath("/students");
   revalidatePath("/fees");
+  await logAction("Classes", "Updated class", values.name);
 }
 
 export async function deleteGrade(id: string) {
+  await requireAdmin();
   const supabase = await createClient();
   const { error } = await supabase.from("grades").delete().eq("id", id);
   if (error) throw error;
   revalidatePath("/settings");
   revalidatePath("/students");
+  await logAction("Classes", "Deleted a class");
 }

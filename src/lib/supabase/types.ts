@@ -1,5 +1,7 @@
 export type ScholarshipType = "none" | "half" | "full";
 
+export type StudentStatus = "active" | "expelled" | "withdrawn";
+
 export type Grade = {
   id: string;
   name: string;
@@ -19,6 +21,10 @@ export type Student = {
   address: string | null;
   scholarship_type: ScholarshipType;
   is_active: boolean;
+  status: StudentStatus;
+  exit_reason: string | null;
+  exit_date: string | null;
+  security_fee: number;
   admission_date: string | null;
   created_at: string;
   updated_at: string;
@@ -60,6 +66,60 @@ export type Setting = {
   updated_at: string;
 };
 
+export type UserRole = "principal" | "admin" | "staff";
+
+export type AppUser = {
+  id: string;
+  name: string;
+  username: string;
+  role: UserRole;
+  pin_hash: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AuditLog = {
+  id: string;
+  user_id: string | null;
+  user_name: string | null;
+  role: string | null;
+  category: string;
+  action: string;
+  details: string | null;
+  created_at: string;
+};
+
+export type ExpenseStatus = "pending" | "approved" | "rejected";
+
+export type ExpenseCategory = {
+  id: string;
+  name: string;
+  created_at: string;
+};
+
+export type Expense = {
+  id: string;
+  title: string;
+  amount: number;
+  category_id: string | null;
+  expense_date: string;
+  payment_method: string | null;
+  paid_to: string | null;
+  notes: string | null;
+  recorded_by: string | null;
+  status: ExpenseStatus;
+  created_by: string | null;
+  created_by_name: string | null;
+  approved_by_name: string | null;
+  approved_at: string | null;
+  reject_reason: string | null;
+  created_at: string;
+  updated_at: string;
+  // joined
+  category?: ExpenseCategory | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -89,6 +149,16 @@ export type Database = {
         Row: Setting;
         Insert: Omit<Setting, "id" | "updated_at">;
         Update: Partial<Omit<Setting, "id" | "updated_at">>;
+      };
+      expense_categories: {
+        Row: ExpenseCategory;
+        Insert: Omit<ExpenseCategory, "id" | "created_at">;
+        Update: Partial<Omit<ExpenseCategory, "id" | "created_at">>;
+      };
+      expenses: {
+        Row: Expense;
+        Insert: Omit<Expense, "id" | "created_at" | "updated_at" | "category">;
+        Update: Partial<Omit<Expense, "id" | "created_at" | "updated_at" | "category">>;
       };
     };
   };

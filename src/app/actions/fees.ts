@@ -3,7 +3,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { FeeChallan } from "@/lib/supabase/types";
-import { computeDiscount, computeTotal, getDueDate } from "@/lib/fee-utils";
+import { computeDiscount, computeTotal, getDueDate, getMonthName } from "@/lib/fee-utils";
+import { requireUser } from "@/lib/auth";
+import { logAction } from "@/app/actions/audit";
 
 export async function getChallans(month?: number, year?: number): Promise<FeeChallan[]> {
   const supabase = await createClient();
@@ -90,6 +92,7 @@ export async function generateMonthlyFees(month: number, year: number) {
   if (error) throw error;
   revalidatePath("/fees");
   revalidatePath("/dashboard");
+  await logAction("Fees", "Generated monthly fees", `${getMonthName(month)} ${year} · ${challans.length} challans`);
   return challans.length;
 }
 
@@ -166,6 +169,7 @@ export async function markChallanPaid(
   paidBy: string,
   paymentNotes?: string
 ) {
+  await requireUser();
   const supabase = await createClient();
   const { error } = await supabase
     .from("fee_challans")
@@ -180,9 +184,11 @@ export async function markChallanPaid(
   revalidatePath("/fees");
   revalidatePath(`/fees/${id}`);
   revalidatePath("/dashboard");
+  await logAction("Fees", "Marked challan paid", `received by ${paidBy}`);
 }
 
 export async function markChallanUnpaid(id: string) {
+  await requireUser();
   const supabase = await createClient();
   const { error } = await supabase
     .from("fee_challans")
@@ -192,6 +198,7 @@ export async function markChallanUnpaid(id: string) {
   revalidatePath("/fees");
   revalidatePath(`/fees/${id}`);
   revalidatePath("/dashboard");
+  await logAction("Fees", "Reverted challan to unpaid");
 }
 
 export async function getDashboardStats(month: number, year: number) {

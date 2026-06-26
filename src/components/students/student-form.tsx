@@ -36,6 +36,7 @@ export function StudentForm({ grades, student }: StudentFormProps) {
     address: student?.address ?? "",
     scholarship_type: student?.scholarship_type ?? "none",
     admission_date: student?.admission_date ?? "",
+    security_fee: student?.security_fee != null ? String(student.security_fee) : "",
   });
 
   const set = (key: keyof typeof form, value: string | null) =>
@@ -62,6 +63,7 @@ export function StudentForm({ grades, student }: StudentFormProps) {
           ...form,
           scholarship_type: form.scholarship_type as "none" | "half" | "full",
           admission_date: form.admission_date || undefined,
+          security_fee: parseFloat(form.security_fee) || 0,
         });
         toast.success("Student updated");
         router.push(`/students/${student.id}`);
@@ -70,6 +72,7 @@ export function StudentForm({ grades, student }: StudentFormProps) {
           ...form,
           scholarship_type: form.scholarship_type as "none" | "half" | "full",
           admission_date: form.admission_date || undefined,
+          security_fee: parseFloat(form.security_fee) || 0,
         });
         toast.success("Student added successfully");
         router.push(`/students/${s.id}`);
@@ -151,6 +154,19 @@ export function StudentForm({ grades, student }: StudentFormProps) {
                 <SelectItem value="full">Full Scholarship — 100% waiver</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="security_fee">Security Fee / Deposit <span className="text-muted-foreground text-xs">(refundable, collected at admission)</span></Label>
+            <Input
+              id="security_fee"
+              type="number"
+              min="0"
+              step="1"
+              placeholder="0"
+              value={form.security_fee}
+              onChange={(e) => set("security_fee", e.target.value)}
+            />
           </div>
 
           {/* Fee preview */}

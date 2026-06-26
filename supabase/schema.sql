@@ -49,6 +49,12 @@ create table if not exists students (
   address text,
   scholarship_type text not null default 'none' check (scholarship_type in ('none', 'half', 'full')),
   is_active boolean not null default true,
+  -- Lifecycle: active students have status 'active'; exits set is_active=false
+  status text not null default 'active' check (status in ('active', 'expelled', 'withdrawn')),
+  exit_reason text,
+  exit_date date,
+  -- Refundable security deposit collected at admission (held in security treasury)
+  security_fee numeric(12,2) not null default 0,
   admission_date date,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
@@ -56,6 +62,7 @@ create table if not exists students (
 
 create index if not exists students_grade_id_idx on students(grade_id);
 create index if not exists students_registration_number_idx on students(registration_number);
+create index if not exists students_status_idx on students(status);
 
 -- =============================================
 -- FEE CHALLANS

@@ -13,6 +13,8 @@ export type PeriodPoint = {
   collected: number;
   expected: number;
   outstanding: number;
+  expenses: number;
+  net: number; // collected - expenses
 };
 
 export type ClassPoint = {
@@ -44,10 +46,15 @@ export type FinanceAnalytics = {
   collectionRate: number; // % by count (paid / generated)
   amountRate: number; // % by amount (collected / expected)
   bestMonth: { label: string; collected: number } | null;
+  totalExpenses: number;
+  netProfit: number; // yearly collected - expenses
+  expensesByCategory: { name: string; total: number }[];
+  securityTreasury: number;   // sum of security deposits held for active students
+  securityStudents: number;   // # active students with a deposit
 };
 
 function emptyPoint(key: string, label: string): PeriodPoint {
-  return { key, label, generated: 0, paid: 0, unpaid: 0, collected: 0, expected: 0, outstanding: 0 };
+  return { key, label, generated: 0, paid: 0, unpaid: 0, collected: 0, expected: 0, outstanding: 0, expenses: 0, net: 0 };
 }
 
 function accumulate(point: PeriodPoint, c: FeeChallan) {
@@ -71,6 +78,31 @@ export async function getFinanceAnalytics(year: number): Promise<FinanceAnalytic
   if (error) throw error;
 
   const challans = (data ?? []) as unknown as FeeChallan[];
+
+  // Expenses for the same year (by expense_date)
+  const yearStart = `${year}-01-01`;
+  const yearEnd = `${year + 1}-01-01`;
+  // Resilient: if the expenses table doesn't exist yet (migration not run), treat as no expenses.
+  const { data: expenseRows } = await supabase
+    .from("expenses")
+    .select("amount, expense_date, category:expense_categories(name)")
+    .eq("status", "approved")
+    .gte("expense_date", yearStart)
+    .lt("expense_date", yearEnd);
+  const expenses = (expenseRows ?? []) as unknown as {
+    amount: number;
+    expense_date: string;
+    category: { name: string } | null;
+  }[];
+
+  // Security deposit treasury — held for currently active students (resilient if column missing)
+  const { data: secRows } = await supabase
+    .from("students")
+    .select("security_fee")
+    .eq("is_active", true);
+  const secStudents = (secRows ?? []) as unknown as { security_fee: number | null }[];
+  const securityTreasury = secStudents.reduce((s, r) => s + Number(r.security_fee ?? 0), 0);
+  const securityStudents = secStudents.filter((r) => Number(r.security_fee ?? 0) > 0).length;
 
   // Monthly buckets (Jan..Dec)
   const monthly: PeriodPoint[] = MONTHS.map((m, i) => emptyPoint(String(i + 1), m.slice(0, 3)));
@@ -126,6 +158,26 @@ export async function getFinanceAnalytics(year: number): Promise<FinanceAnalytic
     (a, b) => (orderMap.get(a.key) ?? 9999) - (orderMap.get(b.key) ?? 9999)
   );
 
+  // Bucket expenses into the same periods, then compute net (collected - expenses)
+  const expCatMap = new Map<string, number>();
+  for (const e of expenses) {
+    const mIdx = new Date(e.expense_date).getMonth();
+    const amount = Number(e.amount) || 0;
+    if (mIdx >= 0 && mIdx < 12) {
+      monthly[mIdx].expenses += amount;
+      quarterly[Math.floor(mIdx / 3)].expenses += amount;
+    }
+    yearly.expenses += amount;
+    const catName = e.category?.name ?? "Uncategorized";
+    expCatMap.set(catName, (expCatMap.get(catName) ?? 0) + amount);
+  }
+  const expensesByCategory = [...expCatMap.entries()]
+    .map(([name, total]) => ({ name, total }))
+    .sort((a, b) => b.total - a.total);
+  for (const p of [...monthly, ...quarterly, yearly]) {
+    p.net = p.collected - p.expenses;
+  }
+
   const collectionRate = yearly.generated > 0 ? Math.round((yearly.paid / yearly.generated) * 100) : 0;
   const amountRate = yearly.expected > 0 ? Math.round((yearly.collected / yearly.expected) * 100) : 0;
   const avgChallan = yearly.generated > 0 ? Math.round(yearly.expected / yearly.generated) : 0;
@@ -147,5 +199,10 @@ export async function getFinanceAnalytics(year: number): Promise<FinanceAnalytic
     collectionRate,
     amountRate,
     bestMonth: bestMonth ? { label: bestMonth.label, collected: bestMonth.collected } : null,
+    totalExpenses: yearly.expenses,
+    netProfit: yearly.net,
+    expensesByCategory,
+    securityTreasury,
+    securityStudents,
   };
 }

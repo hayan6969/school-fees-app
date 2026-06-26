@@ -4,9 +4,11 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { formatCurrency, getMonthName } from "@/lib/fee-utils";
+import type { ExpenseAnalytics } from "@/app/actions/expenses";
 import { cn } from "@/lib/utils";
 import {
   Users, CheckCircle2, Clock, Banknote, Award, GraduationCap, Zap, TrendingUp,
+  Wallet, TrendingDown, Scale,
 } from "lucide-react";
 
 interface DashboardClientProps {
@@ -21,13 +23,15 @@ interface DashboardClientProps {
     halfScholarships: number;
   };
   settings: Record<string, string>;
+  treasury: ExpenseAnalytics;
   month: number;
   year: number;
 }
 
-export function DashboardClient({ stats, settings, month, year }: DashboardClientProps) {
+export function DashboardClient({ stats, settings, treasury, month, year }: DashboardClientProps) {
   const rate = stats.totalChallans > 0 ? Math.round((stats.paidCount / stats.totalChallans) * 100) : 0;
   const schoolName = settings.school_name || "School";
+  const netThisMonth = stats.totalCollected - treasury.thisMonthExpenses;
 
   return (
     <div className="p-6 space-y-6">
@@ -68,6 +72,33 @@ export function DashboardClient({ stats, settings, month, year }: DashboardClien
           sub={`${stats.totalChallans} challans total`}
           icon={TrendingUp}
           color={rate >= 80 ? "emerald" : rate >= 50 ? "amber" : "red"}
+        />
+      </div>
+
+      {/* Treasury row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <StatCard
+          title="Treasury Balance"
+          value={formatCurrency(treasury.treasuryBalance)}
+          sub="opening + fees − expenses"
+          icon={Wallet}
+          color={treasury.treasuryBalance >= 0 ? "emerald" : "red"}
+          href="/expenses"
+        />
+        <StatCard
+          title="Expenses This Month"
+          value={formatCurrency(treasury.thisMonthExpenses)}
+          sub={`${getMonthName(month)} spending`}
+          icon={TrendingDown}
+          color="red"
+          href="/expenses"
+        />
+        <StatCard
+          title="Net This Month"
+          value={formatCurrency(netThisMonth)}
+          sub="collected − expenses"
+          icon={Scale}
+          color={netThisMonth >= 0 ? "emerald" : "red"}
         />
       </div>
 

@@ -14,8 +14,8 @@ import {
 import { formatCurrency } from "@/lib/fee-utils";
 import { cn } from "@/lib/utils";
 import {
-  Banknote, FileText, CheckCircle2, Clock, TrendingUp, Loader2,
-  Wallet, Award, Calendar, PieChart as PieIcon,
+  Banknote, FileText, CheckCircle2, Clock, TrendingUp, TrendingDown, Loader2,
+  Wallet, Award, Calendar, PieChart as PieIcon, Scale, ShieldCheck,
 } from "lucide-react";
 
 const YEARS = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 3 + i);
@@ -115,6 +115,48 @@ export function FinanceClient({ initialAnalytics, initialYear }: FinanceClientPr
             />
           </div>
 
+          {/* Profit row — collections netted against expenses */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <KpiCard
+              title="Total Collected"
+              value={formatCurrency(yearly.collected)}
+              sub={`income · ${analytics.year}`}
+              icon={Banknote} color="green"
+            />
+            <KpiCard
+              title="Total Expenses"
+              value={formatCurrency(analytics.totalExpenses)}
+              sub={`spending · ${analytics.year}`}
+              icon={TrendingDown} color="red"
+            />
+            <KpiCard
+              title="Net Profit"
+              value={formatCurrency(analytics.netProfit)}
+              sub={analytics.netProfit >= 0 ? "collections − expenses" : "operating at a loss"}
+              icon={Scale}
+              color={analytics.netProfit >= 0 ? "emerald" : "red"}
+            />
+          </div>
+
+          {/* Security deposits — a separate treasury, not income */}
+          <Card>
+            <CardContent className="p-5 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-lg bg-blue-50 text-blue-600 shrink-0">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Security Fees Treasury</p>
+                  <p className="text-2xl font-bold leading-none mt-1">{formatCurrency(analytics.securityTreasury)}</p>
+                </div>
+              </div>
+              <div className="text-right text-xs text-muted-foreground">
+                <p>Refundable deposits held for <span className="font-semibold text-foreground">{analytics.securityStudents}</span> active student{analytics.securityStudents !== 1 ? "s" : ""}</p>
+                <p className="mt-0.5">Refunded on withdrawal / expulsion · not counted as income</p>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Secondary KPIs */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <KpiCard
@@ -147,7 +189,7 @@ export function FinanceClient({ initialAnalytics, initialYear }: FinanceClientPr
           <Card>
             <CardContent className="p-5 space-y-5">
               <div className="flex items-center justify-between gap-3 flex-wrap">
-                <h3 className="font-semibold text-sm">Collections Breakdown</h3>
+                <h3 className="font-semibold text-sm">Collections, Expenses &amp; Net</h3>
                 <Tabs value={granularity} onValueChange={(v) => setGranularity(v as Granularity)}>
                   <TabsList>
                     <TabsTrigger value="monthly">Monthly</TabsTrigger>
@@ -170,6 +212,8 @@ export function FinanceClient({ initialAnalytics, initialYear }: FinanceClientPr
                       <Th className="text-right">Collected</Th>
                       <Th className="text-right">Expected</Th>
                       <Th className="text-right">Outstanding</Th>
+                      <Th className="text-right">Expenses</Th>
+                      <Th className="text-right">Net</Th>
                       <Th className="text-right">Rate</Th>
                     </TableRow>
                   </TableHeader>
@@ -184,6 +228,8 @@ export function FinanceClient({ initialAnalytics, initialYear }: FinanceClientPr
                           <TableCell className="text-right text-sm tabular-nums font-medium">{formatCurrency(p.collected)}</TableCell>
                           <TableCell className="text-right text-sm tabular-nums text-muted-foreground">{formatCurrency(p.expected)}</TableCell>
                           <TableCell className="text-right text-sm tabular-nums text-amber-600">{formatCurrency(p.outstanding)}</TableCell>
+                          <TableCell className="text-right text-sm tabular-nums text-red-600">{formatCurrency(p.expenses)}</TableCell>
+                          <TableCell className={cn("text-right text-sm tabular-nums font-medium", p.net >= 0 ? "text-emerald-700" : "text-red-600")}>{formatCurrency(p.net)}</TableCell>
                           <TableCell className="text-right text-sm tabular-nums">
                             <RateBadge rate={rate} />
                           </TableCell>
@@ -245,6 +291,42 @@ export function FinanceClient({ initialAnalytics, initialYear }: FinanceClientPr
               </CardContent>
             </Card>
           </div>
+
+          {/* Expenses by category (where the money went) */}
+          <Card>
+            <CardContent className="p-5 space-y-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <TrendingDown className="h-4 w-4 text-muted-foreground" /> Expenses by Category · {analytics.year}
+                </h3>
+                <span className="text-xs text-muted-foreground">
+                  Total <span className="font-semibold text-foreground">{formatCurrency(analytics.totalExpenses)}</span>
+                </span>
+              </div>
+              {analytics.expensesByCategory.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No expenses recorded for {analytics.year}.</p>
+              ) : (
+                <div className="space-y-3">
+                  {analytics.expensesByCategory.map((c) => {
+                    const pct = analytics.totalExpenses > 0 ? Math.round((c.total / analytics.totalExpenses) * 100) : 0;
+                    return (
+                      <div key={c.name} className="space-y-1">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-medium">{c.name}</span>
+                          <span className="text-muted-foreground tabular-nums">
+                            {formatCurrency(c.total)} <span className="text-muted-foreground/50">· {pct}%</span>
+                          </span>
+                        </div>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-red-400 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </>
       )}
     </div>

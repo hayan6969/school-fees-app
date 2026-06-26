@@ -2,6 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { requireAdmin } from "@/lib/auth";
+import { logAction } from "@/app/actions/audit";
 
 type SettingRow = { key: string; value: string };
 
@@ -15,6 +17,7 @@ export async function getSettings(): Promise<Record<string, string>> {
 }
 
 export async function updateSetting(key: string, value: string) {
+  await requireAdmin();
   const supabase = await createClient();
   const { error } = await supabase
     .from("settings")
@@ -22,9 +25,11 @@ export async function updateSetting(key: string, value: string) {
   if (error) throw error;
   revalidatePath("/settings");
   revalidatePath("/dashboard");
+  await logAction("Settings", "Updated a setting", key);
 }
 
 export async function updateSettings(settings: Record<string, string>) {
+  await requireAdmin();
   const supabase = await createClient();
   const upserts = Object.entries(settings).map(([key, value]) => ({ key, value }));
   const { error } = await supabase
@@ -33,4 +38,5 @@ export async function updateSettings(settings: Record<string, string>) {
   if (error) throw error;
   revalidatePath("/settings");
   revalidatePath("/dashboard");
+  await logAction("Settings", "Updated settings", Object.keys(settings).join(", "));
 }

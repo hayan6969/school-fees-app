@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { Student } from "@/lib/supabase/types";
 import { generateRegistrationNumber } from "@/lib/fee-utils";
+import { requireUser } from "@/lib/auth";
+import { logAction } from "@/app/actions/audit";
 
 export async function getStudents(gradeId?: string): Promise<Student[]> {
   const supabase = await createClient();
@@ -52,6 +54,7 @@ export async function createStudent(values: {
   address?: string;
   scholarship_type: "none" | "half" | "full";
   admission_date?: string;
+  security_fee?: number;
 }) {
   const supabase = await createClient();
   const { data: existing } = await supabase
@@ -70,6 +73,7 @@ export async function createStudent(values: {
   if (error) throw error;
   revalidatePath("/students");
   revalidatePath("/dashboard");
+  await logAction("Students", "Added student", `${values.full_name} (${registration_number})`);
   return data as unknown as Student;
 }
 
@@ -84,6 +88,7 @@ export async function updateStudent(
     scholarship_type: "none" | "half" | "full";
     admission_date: string;
     is_active: boolean;
+    security_fee: number;
   }>
 ) {
   const supabase = await createClient();
@@ -103,4 +108,181 @@ export async function deleteStudent(id: string) {
   if (error) throw error;
   revalidatePath("/students");
   revalidatePath("/dashboard");
+}
+
+// =============================================
+// Student lifecycle: promote / demote / retain / expel / withdraw
+// =============================================
+
+type GradeOrder = { id: string; display_order: number };
+
+async function getGradeLadder(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<GradeOrder[]> {
+  const { data, error } = await supabase
+    .from("grades")
+    .select("id, display_order")
+    .order("display_order", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as unknown as GradeOrder[];
+}
+
+/** Move a single student up (+1) or down (-1) the class ladder. */
+async function moveStudent(id: string, delta: 1 | -1) {
+  await requireUser();
+  const supabase = await createClient();
+  const { data: student, error: sErr } = await supabase
+    .from("students")
+    .select("grade_id, full_name")
+    .eq("id", id)
+    .single();
+  if (sErr) throw sErr;
+  const s = student as unknown as { grade_id: string | null; full_name: string };
+  const gradeId = s?.grade_id;
+  if (!gradeId) throw new Error("Assign a class to this student before promoting or demoting.");
+
+  const ladder = await getGradeLadder(supabase);
+  const idx = ladder.findIndex((g) => g.id === gradeId);
+  const target = ladder[idx + delta];
+  if (!target) {
+    throw new Error(delta > 0 ? "Student is already in the highest class." : "Student is already in the lowest class.");
+  }
+
+  const { error } = await supabase
+    .from("students")
+    .update({ grade_id: target.id } as never)
+    .eq("id", id);
+  if (error) throw error;
+  revalidatePath("/students");
+  revalidatePath(`/students/${id}`);
+  revalidatePath("/dashboard");
+  await logAction("Students", delta > 0 ? "Promoted student" : "Demoted student", s.full_name);
+}
+
+export async function promoteStudent(id: string) {
+  return moveStudent(id, 1);
+}
+
+export async function demoteStudent(id: string) {
+  return moveStudent(id, -1);
+}
+
+/** Retain keeps the student in their current class — an explicit no-op that re-affirms the class. */
+export async function retainStudent(id: string) {
+  const supabase = await createClient();
+  const { data: student, error: sErr } = await supabase
+    .from("students")
+    .select("grade_id")
+    .eq("id", id)
+    .single();
+  if (sErr) throw sErr;
+  const gradeId = (student as unknown as { grade_id: string | null })?.grade_id ?? null;
+  // Re-set the same class (no change) so the action succeeds without touching new columns.
+  const { error } = await supabase
+    .from("students")
+    .update({ grade_id: gradeId } as never)
+    .eq("id", id);
+  if (error) throw error;
+  revalidatePath("/students");
+  revalidatePath(`/students/${id}`);
+}
+
+export type StudentDues = {
+  count: number;
+  total: number;
+  challans: { id: string; month: number; year: number; total: number }[];
+};
+
+/** Returns all unpaid challans for a student (used to block exits with outstanding dues). */
+export async function getStudentDues(id: string): Promise<StudentDues> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("fee_challans")
+    .select("id, month, year, total")
+    .eq("student_id", id)
+    .eq("is_paid", false)
+    .order("year", { ascending: true })
+    .order("month", { ascending: true });
+  if (error) throw error;
+  const challans = (data ?? []) as unknown as StudentDues["challans"];
+  const total = challans.reduce((sum, c) => sum + Number(c.total), 0);
+  return { count: challans.length, total, challans };
+}
+
+async function exitStudent(id: string, status: "expelled" | "withdrawn", reason: string | null) {
+  await requireUser();
+  const supabase = await createClient();
+
+  // Guard: block the exit while any dues are outstanding.
+  const dues = await getStudentDues(id);
+  if (dues.count > 0) {
+    throw new Error(
+      `Cannot ${status === "expelled" ? "expel" : "withdraw"} — ${dues.count} unpaid challan(s) totaling Rs ${dues.total.toLocaleString("en-PK")}. Clear all dues first.`
+    );
+  }
+
+  const { error } = await supabase
+    .from("students")
+    .update({
+      status,
+      is_active: false,
+      exit_reason: reason?.trim() || null,
+      exit_date: new Date().toISOString().split("T")[0],
+    } as never)
+    .eq("id", id);
+  if (error) throw error;
+  revalidatePath("/students");
+  revalidatePath(`/students/${id}`);
+  revalidatePath("/dashboard");
+  await logAction("Students", status === "expelled" ? "Expelled student" : "Withdrew student", reason ?? undefined);
+}
+
+export async function expelStudent(id: string, reason: string) {
+  if (!reason?.trim()) throw new Error("A reason is required to expel a student.");
+  return exitStudent(id, "expelled", reason);
+}
+
+export async function withdrawStudent(id: string, reason?: string) {
+  return exitStudent(id, "withdrawn", reason ?? null);
+}
+
+/** Restore an expelled/withdrawn student to active. */
+export async function reinstateStudent(id: string) {
+  await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("students")
+    .update({ status: "active", is_active: true, exit_reason: null, exit_date: null } as never)
+    .eq("id", id);
+  if (error) throw error;
+  revalidatePath("/students");
+  revalidatePath(`/students/${id}`);
+  revalidatePath("/dashboard");
+  await logAction("Students", "Reinstated student");
+}
+
+/** Promote or demote every active student in a class. Returns how many were moved. */
+export async function bulkMoveClass(gradeId: string, delta: 1 | -1): Promise<number> {
+  await requireUser();
+  const supabase = await createClient();
+  const ladder = await getGradeLadder(supabase);
+  const idx = ladder.findIndex((g) => g.id === gradeId);
+  if (idx === -1) throw new Error("Class not found.");
+  const target = ladder[idx + delta];
+  if (!target) {
+    throw new Error(delta > 0 ? "This is already the highest class — nowhere to promote to." : "This is already the lowest class — nowhere to demote to.");
+  }
+
+  const { data, error } = await supabase
+    .from("students")
+    .update({ grade_id: target.id } as never)
+    .eq("grade_id", gradeId)
+    .eq("is_active", true)
+    .select("id");
+  if (error) throw error;
+  const moved = ((data ?? []) as unknown[]).length;
+  revalidatePath("/students");
+  revalidatePath("/dashboard");
+  await logAction("Students", delta > 0 ? "Bulk promoted a class" : "Bulk demoted a class", `${moved} student(s)`);
+  return moved;
 }
