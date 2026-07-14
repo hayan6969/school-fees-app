@@ -1,4 +1,4 @@
-export type ScholarshipType = "none" | "half" | "full";
+export type ScholarshipType = "none" | "half" | "full" | "sibling";
 
 export type StudentStatus = "active" | "expelled" | "withdrawn";
 
@@ -20,6 +20,7 @@ export type Student = {
   parent_phone: string | null;
   address: string | null;
   scholarship_type: ScholarshipType;
+  sibling_id: string | null;
   is_active: boolean;
   status: StudentStatus;
   exit_reason: string | null;
@@ -91,6 +92,36 @@ export type AuditLog = {
 };
 
 export type ExpenseStatus = "pending" | "approved" | "rejected";
+
+export type EmployeeType = "teacher" | "staff";
+
+export type Employee = {
+  id: string;
+  name: string;
+  type: EmployeeType;
+  designation: string | null;
+  phone: string | null;
+  monthly_pay: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Payroll = {
+  id: string;
+  employee_id: string;
+  month: number;
+  year: number;
+  amount: number;
+  is_paid: boolean;
+  paid_at: string | null;
+  paid_by: string | null;
+  expense_id: string | null;
+  created_at: string;
+  updated_at: string;
+  // joined
+  employee?: Employee;
+};
 
 export type ExpenseCategory = {
   id: string;

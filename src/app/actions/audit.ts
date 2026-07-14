@@ -5,7 +5,7 @@ import { getCurrentUser, type SessionUser } from "@/lib/auth";
 import type { AuditLog } from "@/lib/supabase/types";
 
 export type LogCategory =
-  | "Auth" | "Students" | "Fees" | "Expenses" | "Users" | "Classes" | "Settings";
+  | "Auth" | "Students" | "Fees" | "Expenses" | "Users" | "Classes" | "Settings" | "Payroll";
 
 /**
  * Record an audit entry. `actor` can be passed when the current user isn't yet
