@@ -50,6 +50,8 @@ export function PrintableChallan({ challan, settings }: PrintableChallanProps) {
       ? "Full Scholarship (100%)"
       : challan.scholarship_type === "half"
       ? "Half Scholarship (50%)"
+      : challan.scholarship_type === "sibling"
+      ? "Sibling Discount (20%)"
       : null;
 
   return (

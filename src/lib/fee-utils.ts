@@ -34,10 +34,22 @@ export function getChallanStatus(challan: FeeChallan): "paid" | "unpaid" | "over
   return "unpaid";
 }
 
+export const SIBLING_DISCOUNT_RATE = 0.2; // 20% off tuition for enrolled siblings
+
 export function computeDiscount(tuitionFee: number, scholarship: ScholarshipType): number {
   if (scholarship === "full") return tuitionFee;
   if (scholarship === "half") return Math.floor(tuitionFee / 2);
+  if (scholarship === "sibling") return Math.floor(tuitionFee * SIBLING_DISCOUNT_RATE);
   return 0;
+}
+
+export function getScholarshipLabel(scholarship: ScholarshipType): string {
+  switch (scholarship) {
+    case "full": return "Full Scholarship (100%)";
+    case "half": return "Half Scholarship (50%)";
+    case "sibling": return "Sibling Discount (20%)";
+    default: return "No Scholarship";
+  }
 }
 
 export function computeTotal(challan: {

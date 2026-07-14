@@ -33,6 +33,7 @@ const SCHOLARSHIP_MAP = {
   none: { label: "No Scholarship", color: "secondary" as const },
   half: { label: "Half Scholarship", color: "outline" as const },
   full: { label: "Full Scholarship", color: "default" as const },
+  sibling: { label: "Sibling Discount (20%)", color: "outline" as const },
 };
 
 const STATUS_BADGE: Record<string, { label: string; cls: string } | null> = {

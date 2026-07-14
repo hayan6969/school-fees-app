@@ -14,6 +14,8 @@ export default async function EditStudentPage({
 
   if (!student) notFound();
 
+  const sibling = student.sibling_id ? await getStudent(student.sibling_id) : null;
+
   return (
     <div>
       <Header
@@ -21,7 +23,7 @@ export default async function EditStudentPage({
         description={student.registration_number}
       />
       <div className="p-6">
-        <StudentForm grades={grades} student={student} />
+        <StudentForm grades={grades} student={student} siblingName={sibling?.full_name} />
       </div>
     </div>
   );

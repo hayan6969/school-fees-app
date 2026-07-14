@@ -13,12 +13,13 @@ import {
 import { cn } from "@/lib/utils";
 import { Search, ScrollText } from "lucide-react";
 
-const CATEGORIES = ["Auth", "Students", "Fees", "Expenses", "Users", "Classes", "Settings"];
+const CATEGORIES = ["Auth", "Students", "Fees", "Expenses", "Payroll", "Users", "Classes", "Settings"];
 const CAT_CLS: Record<string, string> = {
   Auth: "bg-slate-50 text-slate-700 border-slate-200",
   Students: "bg-blue-50 text-blue-700 border-blue-200",
   Fees: "bg-emerald-50 text-emerald-700 border-emerald-200",
   Expenses: "bg-amber-50 text-amber-700 border-amber-200",
+  Payroll: "bg-teal-50 text-teal-700 border-teal-200",
   Users: "bg-purple-50 text-purple-700 border-purple-200",
   Classes: "bg-indigo-50 text-indigo-700 border-indigo-200",
   Settings: "bg-gray-50 text-gray-700 border-gray-200",

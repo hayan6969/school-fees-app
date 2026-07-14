@@ -26,6 +26,7 @@ const SCHOLARSHIP_BADGE = {
   none: null,
   half: { label: "Half Scholar", cls: "bg-blue-50 text-blue-700 border-blue-200" },
   full: { label: "Full Scholar", cls: "bg-purple-50 text-purple-700 border-purple-200" },
+  sibling: { label: "Sibling 20%", cls: "bg-teal-50 text-teal-700 border-teal-200" },
 };
 
 export function StudentsClient({ students, grades }: StudentsClientProps) {

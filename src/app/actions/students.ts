@@ -52,9 +52,10 @@ export async function createStudent(values: {
   parent_name?: string;
   parent_phone?: string;
   address?: string;
-  scholarship_type: "none" | "half" | "full";
+  scholarship_type: "none" | "half" | "full" | "sibling";
   admission_date?: string;
   security_fee?: number;
+  sibling_id?: string | null;
 }) {
   const supabase = await createClient();
   const { data: existing } = await supabase
@@ -85,10 +86,11 @@ export async function updateStudent(
     parent_name: string;
     parent_phone: string;
     address: string;
-    scholarship_type: "none" | "half" | "full";
+    scholarship_type: "none" | "half" | "full" | "sibling";
     admission_date: string;
     is_active: boolean;
     security_fee: number;
+    sibling_id: string | null;
   }>
 ) {
   const supabase = await createClient();
